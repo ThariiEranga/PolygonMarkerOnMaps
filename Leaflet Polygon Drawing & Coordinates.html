@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaflet Draw Polygon & Get Coordinates</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          crossorigin=""/>
+
+    <!-- Leaflet Draw CSS - Removed integrity check that was causing issues -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"
+          crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        /* Set height for map container */
+        #map {
+            height: 500px;
+            width: 100%;
+        }
+        /* Basic styling for the output area */
+        #coordinatesOutput {
+            white-space: pre-wrap; /* Preserve formatting */
+            word-wrap: break-word; /* Break long lines */
+            font-family: monospace;
+        }
+        /* Style for disabled button */
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans p-4 md:p-8">
+
+    <div class="container mx-auto bg-white rounded-lg shadow-md p-6">
+        <h1 class="text-2xl font-bold mb-4 text-center text-gray-700">Draw a Polygon on the Map</h1>
+
+        <div class="mb-4 text-center">
+            <button id="drawPolygonBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md shadow transition duration-150 ease-in-out">
+                Start Drawing Polygon
+            </button>
+            <button id="cancelDrawBtn" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md shadow transition duration-150 ease-in-out ml-2" style="display: none;">
+                Cancel Drawing
+            </button>
+        </div>
+
+        <div id="map" class="rounded-md border border-gray-300 mb-4"></div>
+
+        <div class="bg-gray-50 p-4 rounded-md border border-gray-200">
+            <h2 class="text-lg font-semibold mb-2 text-gray-600">Polygon Coordinates:</h2>
+            <div id="coordinatesOutput" class="text-sm text-gray-800">
+                Click the "Start Drawing Polygon" button above the map, then click on the map to place points. Double-click the last point or click the first point to finish.
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            crossorigin=""></script>
+
+    <!-- Leaflet Draw JS - Removed integrity check that was causing issues -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"
+            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <script>
+        // --- Map Initialization ---
+        const map = L.map('map').setView([6.9271, 79.8612], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // --- Get DOM Elements ---
+        const coordinatesOutput = document.getElementById('coordinatesOutput');
+        const drawPolygonBtn = document.getElementById('drawPolygonBtn');
+        const cancelDrawBtn = document.getElementById('cancelDrawBtn');
+
+        // --- Feature Group for Drawn Items ---
+        const drawnItems = new L.FeatureGroup();
+        map.addLayer(drawnItems);
+
+        // Check if Leaflet.Draw is available
+        console.log("Leaflet version:", L.version);
+        const drawPluginAvailable = typeof L.Draw !== 'undefined';
+        console.log("Draw plugin available:", drawPluginAvailable);
+
+        // Initialize the draw control and add it to the map
+        const drawControl = new L.Control.Draw({
+            draw: {
+                // Disable everything except polygon
+                polyline: false,
+                rectangle: false,
+                circle: false,
+                circlemarker: false,
+                marker: false,
+                polygon: {
+                    allowIntersection: false,
+                    showArea: true,
+                    shapeOptions: {
+                        color: '#3b82f6'
+                    }
+                }
+            },
+            edit: {
+                featureGroup: drawnItems,
+                remove: true
+            }
+        });
+        
+        // Add control to map but hide its UI (we'll use our own buttons)
+        map.addControl(drawControl);
+        document.querySelector('.leaflet-draw').style.display = 'none';
+        
+        // --- Button Event Listeners ---
+        drawPolygonBtn.addEventListener('click', function() {
+            console.log("Draw button clicked");
+            
+            // Clear previous drawings
+            drawnItems.clearLayers();
+            
+            // Get the draw polygon button and click it
+            const drawButton = document.querySelector('.leaflet-draw-draw-polygon');
+            if (drawButton) {
+                // Force a small timeout to ensure the UI is ready
+                setTimeout(() => {
+                    drawButton.click();
+                    console.log("Clicked the draw polygon button");
+                    
+                    // Update UI
+                    drawPolygonBtn.disabled = true;
+                    cancelDrawBtn.style.display = 'inline-block';
+                    coordinatesOutput.textContent = "Click on the map to start drawing points. Double-click or click the first point to finish.";
+                }, 50);
+            } else {
+                console.error("Draw button not found");
+                coordinatesOutput.textContent = "Error: Could not initialize drawing tools.";
+            }
+        });
+        
+        cancelDrawBtn.addEventListener('click', function() {
+            console.log("Cancel button clicked");
+            
+            // Find and click the cancel button
+            const cancelButton = document.querySelector('.leaflet-draw-actions a[title="Cancel drawing"]');
+            if (cancelButton) {
+                cancelButton.click();
+                console.log("Cancelled drawing via Leaflet.Draw UI");
+            } else {
+                // Alternative: dispatch Escape key event
+                document.dispatchEvent(new KeyboardEvent('keydown', {
+                    key: 'Escape',
+                    code: 'Escape',
+                    keyCode: 27,
+                    which: 27,
+                    bubbles: true
+                }));
+                console.log("Sent Escape key event to cancel drawing");
+            }
+            
+            // Update UI
+            drawPolygonBtn.disabled = false;
+            cancelDrawBtn.style.display = 'none';
+            if (drawnItems.getLayers().length === 0) {
+                coordinatesOutput.textContent = "Drawing cancelled. Click 'Start Drawing Polygon' to try again.";
+            }
+        });
+        
+        // --- Map Event Handling ---
+        // Handle created shapes
+        map.on('draw:created', function(event) {
+            console.log("Shape created:", event);
+            const layer = event.layer;
+            
+            // Add to our layer group
+            drawnItems.addLayer(layer);
+            
+            // Extract and display coordinates
+            try {
+                const latLngs = layer.getLatLngs()[0];
+                let coordsString = "Polygon Coordinates:\n[\n";
+                latLngs.forEach((latlng, index) => {
+                    coordsString += `  [${latlng.lng.toFixed(6)}, ${latlng.lat.toFixed(6)}]`;
+                    if (index < latLngs.length - 1) {
+                        coordsString += ",\n";
+                    }
+                });
+                coordsString += "\n]";
+                coordinatesOutput.textContent = coordsString;
+            } catch (error) {
+                console.error("Error processing coordinates:", error);
+            }
+            
+            // Reset UI
+            drawPolygonBtn.disabled = false;
+            cancelDrawBtn.style.display = 'none';
+        });
+        
+        // Listen for draw stop event
+        map.on('draw:drawstop', function() {
+            console.log("Drawing stopped via Leaflet.Draw");
+            
+            // Reset UI
+            drawPolygonBtn.disabled = false;
+            cancelDrawBtn.style.display = 'none';
+            
+            if (drawnItems.getLayers().length === 0) {
+                coordinatesOutput.textContent = "Drawing cancelled. Click 'Start Drawing Polygon' to try again.";
+            }
+        });
+        
+        // Listen for draw start event
+        map.on('draw:drawstart', function() {
+            console.log("Drawing started via Leaflet.Draw");
+        });
+        
+        // Ensure the draw control is available after the page has fully loaded
+        window.addEventListener('load', function() {
+            console.log("Page fully loaded");
+            console.log("Draw control exists:", !!document.querySelector('.leaflet-draw-draw-polygon'));
+        });
+    </script>
+
+</body>
+</html>
+``` 
